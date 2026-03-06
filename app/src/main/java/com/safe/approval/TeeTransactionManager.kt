@@ -6,9 +6,11 @@ import android.security.ConfirmationCallback
 import android.security.ConfirmationNotAvailableException
 import android.security.ConfirmationPrompt
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
 import android.util.Log
 import androidx.fragment.app.FragmentActivity
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.Signature
@@ -100,7 +102,46 @@ class TeeTransactionManager(private val activity: FragmentActivity) {
     }
 
     // ------------------------------------------------------------------
-    // 2. Sign transaction data with TEE-held key
+    // 2. Verify TEE status — proof that key lives in secure hardware
+    // ------------------------------------------------------------------
+
+    data class TeeStatus(
+        val isInsideSecureHardware: Boolean,
+        val securityLevel: String,
+        val protectedConfirmation: Boolean
+    )
+
+    fun getTeeStatus(): TeeStatus {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        val entry = ks.getEntry(KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry
+            ?: return TeeStatus(false, "NO KEY FOUND", false)
+
+        val keyFactory = KeyFactory.getInstance(
+            entry.privateKey.algorithm, "AndroidKeyStore"
+        )
+        val keyInfo = keyFactory.getKeySpec(entry.privateKey, KeyInfo::class.java)
+
+        val isHardware = keyInfo.isInsideSecureHardware
+        val level = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            when (keyInfo.securityLevel) {
+                KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT -> "TEE"
+                KeyProperties.SECURITY_LEVEL_STRONGBOX -> "STRONGBOX"
+                KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE -> "SECURE (Unknown)"
+                else -> "SOFTWARE"
+            }
+        } else {
+            if (isHardware) "TEE (Hardware-backed)" else "SOFTWARE"
+        }
+
+        val protectedConfirm = ConfirmationPrompt.isSupported(activity)
+
+        Log.d(TAG, "TEE Status: hardware=$isHardware, level=$level, protectedConfirm=$protectedConfirm")
+
+        return TeeStatus(isHardware, level, protectedConfirm)
+    }
+
+    // ------------------------------------------------------------------
+    // 3. Sign transaction data with TEE-held key
     // ------------------------------------------------------------------
 
     private fun signData(data: ByteArray): ByteArray {

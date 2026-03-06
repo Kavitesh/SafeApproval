@@ -67,10 +67,30 @@ class MainActivity : AppCompatActivity() {
         tvTeeBadge = findViewById(R.id.tv_tee_badge)
     }
 
+    private lateinit var tvTeeStatusDetail: TextView
+
     private fun initTee() {
         teeManager = TeeTransactionManager(this)
         teeManager.ensureKeyPair()
-        tvTeeBadge.text = "TEE Key Ready"
+
+        tvTeeStatusDetail = findViewById(R.id.tv_tee_status_detail)
+
+        val status = teeManager.getTeeStatus()
+        if (status.isInsideSecureHardware) {
+            tvTeeBadge.text = "TEE Verified"
+            tvTeeBadge.setBackgroundResource(R.drawable.badge_tee)
+        } else {
+            tvTeeBadge.text = "Software Key"
+            tvTeeBadge.setBackgroundResource(R.drawable.badge_software)
+        }
+
+        val statusText = buildString {
+            append("Key Storage: ${status.securityLevel}\n")
+            append("Hardware-Backed: ${if (status.isInsideSecureHardware) "YES" else "NO"}\n")
+            append("Protected Confirmation: ${if (status.protectedConfirmation) "YES" else "NO"}")
+        }
+        tvTeeStatusDetail.text = statusText
+        tvTeeStatusDetail.visibility = View.VISIBLE
     }
 
     private fun setupListeners() {
@@ -110,9 +130,12 @@ class MainActivity : AppCompatActivity() {
         teeManager.requestApproval(sampleTransaction, object : TeeTransactionManager.TransactionCallback {
             override fun onApproved(signature: ByteArray) {
                 val sigBase64 = Base64.encodeToString(signature, Base64.NO_WRAP)
+                val status = teeManager.getTeeStatus()
                 showResult(
                     approved = true,
-                    detail = "Signature (Base64):\n${sigBase64.take(44)}…"
+                    detail = "Signed by: ${status.securityLevel}\n" +
+                            "Hardware-Backed: ${if (status.isInsideSecureHardware) "YES" else "NO"}\n\n" +
+                            "Signature (Base64):\n${sigBase64.take(64)}…"
                 )
             }
 

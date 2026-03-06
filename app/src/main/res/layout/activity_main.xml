@@ -45,6 +45,20 @@
             android:textSize="12sp"
             android:textStyle="bold" />
 
+        <!-- TEE Status Detail -->
+        <TextView
+            android:id="@+id/tv_tee_status_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/badge_secure"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:padding="12dp"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
         <!-- Show Transaction Button -->
         <Button
             android:id="@+id/btn_show_transaction"
